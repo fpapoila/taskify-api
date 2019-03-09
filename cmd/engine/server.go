@@ -24,7 +24,7 @@ func NewServer() Server {
 
 	return &server{
 		port:    c.Port,
-		handler: hf.CreateRestHandler(),
+		handler: hf.CreateRestHandler(c.Github),
 	}
 }
 
