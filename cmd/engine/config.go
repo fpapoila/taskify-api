@@ -1,9 +1,9 @@
-package server
+package engine
 
 import (
 	"errors"
 	"fmt"
-	"github.com/taskifyworks/api/cmd/server/handler"
+	"github.com/taskifyworks/api/cmd/engine/handler"
 	"log"
 	"os"
 )

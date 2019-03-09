@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+	"github.com/taskifyworks/api/cmd/app/usecases"
 	"net/http"
 )
 
@@ -12,7 +13,7 @@ type (
 	}
 
 	handlerFactory struct {
-		gitHubConfig *GitHubConfig
+		UseCaseFactory usecases.InteractorFactory
 	}
 
 	GitHubConfig struct {
@@ -27,10 +28,11 @@ type (
 func (hf *handlerFactory) CreateRestHandler() http.Handler {
 	r := mux.NewRouter()
 
-	gh := NewGitHubHandlerFactory(hf.gitHubConfig)
-	r.HandleFunc("/oauth/signup/github", gh.CreateSignUpHandler()).Methods(http.MethodGet)
-	r.HandleFunc("/oauth/signup/github/callback", gh.CreateSignUpCallbackHandler()).Methods(http.MethodPost)
-	r.HandleFunc("/webhooks/github", gh.CreateWebHookHandler()).Methods(http.MethodPost)
+	gh := hf.UseCaseFactory.CreateGitHubInteractor()
+	r.HandleFunc("/oauth/signup/github", func(w http.ResponseWriter, r *http.Request) {
+
+		gh.SignUp()
+	})
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"http://localhost:3000", "https://*.taskify.works"},
@@ -38,8 +40,8 @@ func (hf *handlerFactory) CreateRestHandler() http.Handler {
 	return c.Handler(r)
 }
 
-func NewFactory(gc *GitHubConfig) Factory {
+func NewFactory(uf usecases.InteractorFactory) Factory {
 	return &handlerFactory{
-		gitHubConfig: gc,
+		UseCaseFactory: uf,
 	}
 }

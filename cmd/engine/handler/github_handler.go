@@ -27,7 +27,7 @@ func (gh *gitHubHandlerFactory) CreateSignUpHandler() http.HandlerFunc {
 }
 
 func NewGitHubHandlerFactory(c *GitHubConfig) GitHubHandlerFactory {
-	return &gitHubHandlerFactory{config: c}
+	return nil
 }
 
 func GitHubSignUp(w http.ResponseWriter, r *http.Request) {
