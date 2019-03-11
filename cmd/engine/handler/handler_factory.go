@@ -2,17 +2,21 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 	"github.com/taskifyworks/api/cmd/app/usecases"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
-	"io"
+	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"time"
 )
+
+const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 type (
 	Factory interface {
@@ -34,13 +38,28 @@ type (
 
 func (hf *handlerFactory) CreateRestHandler(gc *GitHubConfig) http.Handler {
 	r := mux.NewRouter()
-	r.HandleFunc("/oauth/csrf", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, time.Now().String())
-	})
+	oauth := r.PathPrefix("/oauth").Subrouter()
 
-	oauth := r.PathPrefix("/oauth/signup").Methods(http.MethodGet).Subrouter()
-	oauth.HandleFunc("/github", createGitHubSignUp(gc))
-	oauth.HandleFunc("/github/callback", createGitHubCallback(gc))
+	oauth.HandleFunc("/github", func(w http.ResponseWriter, r *http.Request) {
+		state := GetRandomString(32)
+		c := &oauth2.Config{
+			ClientID:     gc.ClientId,
+			ClientSecret: gc.ClientSecret,
+			RedirectURL:  "http://taskify.works/oauth/signup/github",
+			Endpoint:     github.Endpoint,
+		}
+		url := c.AuthCodeURL(state)
+
+		d := struct {
+			CSRFToken string `json:"csrfToken"`
+			URL       string `json:"url"`
+		}{
+			state,
+			url,
+		}
+		_ = json.NewEncoder(w).Encode(d)
+	}).Methods(http.MethodGet)
+	oauth.HandleFunc("/signup/github", createGitHubSignUp(gc)).Methods(http.MethodPost)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"http://localhost:3000", "https://taskify.works", "https://*.taskify.works"},
@@ -56,14 +75,19 @@ func NewFactory(uf usecases.InteractorFactory) Factory {
 
 func createGitHubSignUp(gc *GitHubConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		b, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer r.Body.Close()
+		state := string(b)
+
 		c := &oauth2.Config{
 			ClientID:     gc.ClientId,
 			ClientSecret: gc.ClientSecret,
-			RedirectURL:  "http://localhost:3001/oauth/signup/github/callback",
+			RedirectURL:  "http://localhost:3000/oauth/signup/github",
 			Endpoint:     github.Endpoint,
 		}
-
-		state := "My_Secret_Code"
 
 		url := c.AuthCodeURL(state)
 		fmt.Println(url)
@@ -92,4 +116,12 @@ func createGitHubCallback(gc *GitHubConfig) http.HandlerFunc {
 		_ = client
 		http.Redirect(w, r, "https://app.taskify.works", http.StatusSeeOther)
 	}
+}
+
+func GetRandomString(length uint8) string {
+	result := make([]byte, length)
+	for i := range result {
+		result[i] = chars[rand.Intn(len(chars))]
+	}
+	return string(result)
 }
